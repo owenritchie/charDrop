@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container">
+    <div class="logo-container">
+        <a href="/">
+            <img src="static/logoDark.png" alt="Logo" class="logo"/>
+        </a>
+    </div>
+    
+    <!-- join box -->
+    <div class="box">
+        <h2>Join a Room</h2>
+        <p class="room-description">
+            Rooms are virtual spaces where you can chat, share ideas, and collaborate with others on projects in real-time. 
+            Join an existing room to start connecting!
+        </p>
+        <form method="post" class="form">
+            <div class="input-section">
+                <input type="text" placeholder="Choose a name." name="name" value="{{name}}"/>
+            </div>
+            {% if error %}
+            <div class="error-message">{{ error }}</div>
+            {% endif %}
+            <div class="input-section">
+                <input type="text" placeholder="Room Code" name="code" value="{{code}}"/>
+            </div>
+            <div class="button-section">
+                <button type="submit" name="join" id="join-button">Join a Room</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- create box -->
+    <div class="box">
+        <h2>Create a Room</h2>
+        <form method="post" class="form">
+            <div class="input-section">
+                <input type="text" placeholder="Your Name" name="name" required>
+            </div>
+            <div class="input-section">
+                <input type="text" placeholder="Room Name" name="room_name" required>
+            </div>
+            <div class="input-section">
+                <textarea name="room_description" placeholder="Room Description"></textarea>
+            </div>
+            <div class="checkbox-section">
+                <label>
+                    <input type="checkbox" name="is_private"> Private Room
+                </label>
+            </div>
+            <input type="hidden" name="theme" id="theme-input" value="dark">
+            <div class="button-section">
+                <button type="submit" name="create">Create Room</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- public rooms box -->
+    <div class="box">
+        <h2>Public Rooms</h2>
+        <div id="room-list"></div>
+        <div id="empty-room-message" style="display: none;">
+            <div class="empty-room-content">
+                <img src="static/waitingDark.png" id="waiting-image-dark" class="waiting-image" style="display: none;">         
+                <img src="static/waitingLight.png" id="waiting-image-light" class="waiting-image" style="display: none;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lightImage = document.getElementById('waiting-image-light');
+    const darkImage = document.getElementById('waiting-image-dark');
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    
+    function updateWaitingImage() {
+        if (document.body.classList.contains('dark-mode')) {
+            lightImage.style.display = 'none';
+            darkImage.style.display = 'block';
+        } else {
+            lightImage.style.display = 'block';
+            darkImage.style.display = 'none';
+        }
+    }
+
+    function setTheme(isDark) {
+        document.body.classList.toggle('dark-mode', isDark);
+        if (darkModeToggle) {
+            darkModeToggle.checked = isDark;
+        }
+        updateWaitingImage();
+    }
+
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedTheme = localStorage.getItem('theme');
+    
+    if (savedTheme === 'dark' || (savedTheme === null && prefersDark)) {
+        setTheme(true);
+    } else {
+        setTheme(false);
+    }
+
+    if (darkModeToggle) {
+        darkModeToggle.addEventListener('change', function() {
+            setTheme(this.checked);
+            localStorage.setItem('theme', this.checked ? 'dark' : 'light');
+        });
+    }
+
+    const createRoomForm = document.querySelector('form[name="create"]');
+    if (createRoomForm) {
+        createRoomForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            fetch('/create_room', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateRoomList();
+                }
+            });
+        });
+    }
+
+    updateRoomList();
+    createShootingStars();
+
+    const themeInput = document.getElementById("theme-input");
+    const themeToggle = document.getElementById("theme-toggle");
+
+    if (themeToggle) {
+        themeToggle.addEventListener("change", () => {
+            themeInput.value = themeToggle.checked ? "dark" : "light";
+        });
+    }
+
+    themeInput.value = document.body.classList.contains("dark-mode") ? "dark" : "light";
+});
+
+function updateRoomList() {
+    const roomList = document.getElementById('room-list');
+    const emptyRoomMessage = document.getElementById('empty-room-message');
+    
+    roomList.innerHTML = '<p>Loading rooms...</p>';
+    
+    fetch('/get_public_rooms')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(rooms => {
+            console.log("Received rooms:", rooms);
+            
+            if (rooms.error) {
+                throw new Error(rooms.error);
+            }
+            
+            if (Object.keys(rooms).length === 0) {
+                roomList.style.display = 'none';
+                emptyRoomMessage.style.display = 'block';
+            } else {
+                roomList.style.display = 'block';
+                emptyRoomMessage.style.display = 'none';
+                
+                roomList.innerHTML = '';
+                
+                for (const [code, room] of Object.entries(rooms)) {
+                    const roomElement = document.createElement('div');
+                    roomElement.className = 'room-item';
+                    roomElement.innerHTML = `
+                        <h3>${room.name}</h3>
+                        <p>${room.description}</p>
+                        <p>Members: ${room.members}</p>
+                        <form method="post">
+                            <input type="hidden" name="code" value="${code}">
+                            <input type="text" name="name" placeholder="Your Name" required>
+                            <button type="submit" name="join">Join</button>
+                        </form>
+                    `;
+                    roomList.appendChild(roomElement);
+                }
+
+                staggerRoomItemAnimations();
+            }
+        })
+        .catch(error => {
+            console.error("Error fetching rooms:", error);
+            roomList.innerHTML = `<p>Error loading rooms: ${error.message}. Please try again later.</p>`;
+        });
+}
+
+function createShootingStars() {
+    const container = document.querySelector('.container');
+    for (let i = 0; i < 20; i++) {
+        const star = document.createElement('div');
+        star.classList.add('shooting-star');
+        
+        const randomPosition = Math.random() * 200 - 100;
+        const x = randomPosition;
+        const y = -50 - randomPosition * 0.5;
+        
+        star.style.left = `${x}%`;
+        star.style.top = `${y}%`;
+        star.style.animationDelay = `${Math.random() * 5}s`;
+        container.appendChild(star);
+    }
+}
+
+function staggerRoomItemAnimations() {
+    const roomItems = document.querySelectorAll('.room-item');
+    roomItems.forEach((item, index) => {
+        item.style.animationDelay = `${index * 0.1}s`;
+    });
+}
+</script>
+{% endblock %}

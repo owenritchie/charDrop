@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/default.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
+<div class="logo-container">
+    <a href="/">
+        <img src="static/logo.png" alt="Logo" class="logo"/>
+    </a>
+</div>
+
+<div class="message-box">
+    <h2 class="room-num">Room #: {{code}}</h2>
+    <div class="messages" id="messages"></div>
+    <div class="inputs">
+        <textarea id="message" placeholder="Message" rows="3"></textarea>
+        <div class="button-group">
+            <button type="button" id="code-button" onClick="toggleCodeMode()">Code</button>
+            <button type="button" id="send-button" onClick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+let isCodeMode = false;
+var socketio = io();
+const messages = document.getElementById("messages");
+
+const createMessage = (name, msg, isCode, timestamp) => {
+    const isCurrentUser = name === "{{ session.get('name') }}";
+    const nameClass = isCurrentUser ? "user-name" : "other-user-name";
+    let formattedMsg = msg;
+
+    if (isCode) {
+        formattedMsg = `
+            <div class="code-block">
+                <pre><code>${escapeHtml(msg)}</code></pre>
+                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+            </div>`;
+    } else {
+        formattedMsg = escapeHtml(msg);
+    }
+
+    const messageTime = new Date(timestamp).toLocaleString();
+
+    const content = `
+    <div class="text">
+        <span>
+            <strong class="${nameClass}">${name}</strong>: ${formattedMsg}
+        </span>
+        <span class="muted">
+            ${messageTime}
+        </span>
+    </div>
+    `;
+    messages.innerHTML += content;
+
+    document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+    });
+};
+
+const createSystemMessage = (msg) => {
+    const content = `
+    <div class="system-message">
+        ${msg}
+    </div>
+    `;
+    messages.innerHTML += content;
+};
+
+socketio.on("message", (data) => {
+    if (data.name && (data.message.includes("has entered the room") || data.message.includes("has left the room"))) {
+        createSystemMessage(data.name + " " + data.message);
+    } else {
+        createMessage(data.name, data.message, data.isCode, data.timestamp);
+    }
+});
+
+function copyCode(btn) {
+    const codeBlock = btn.previousElementSibling.querySelector('code');
+    const code = codeBlock.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    });
+}
+
+function sendMessage() {
+    const messageContent = document.getElementById("message").value;
+    if (messageContent.trim() === "") return;
+    
+    socketio.emit("message", { data: messageContent, isCode: isCodeMode });
+    document.getElementById("message").value = "";
+    
+    if (isCodeMode) {
+        toggleCodeMode();
+    }
+}
+
+function insertCodeBlock() {
+    const message = document.getElementById("message");
+    const codeBlock = "```\n\n```";
+    const startPos = message.selectionStart;
+    const endPos = message.selectionEnd;
+    message.value = message.value.substring(0, startPos) + codeBlock + message.value.substring(endPos);
+    message.focus();
+    message.selectionStart = startPos + 4;
+    message.selectionEnd = startPos + 4;
+}
+
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function toggleCodeMode() {
+    isCodeMode = !isCodeMode;
+    const codeButton = document.getElementById('code-button');
+    const messageTextarea = document.getElementById('message');
+    
+    if (isCodeMode) {
+        codeButton.textContent = 'Text';
+        codeButton.classList.add('active');
+        messageTextarea.placeholder = 'Enter your code here...';
+    } else {
+        codeButton.textContent = 'Code';
+        codeButton.classList.remove('active');
+        messageTextarea.placeholder = 'Message';
+    }
+}
+
+function createShootingStars() {
+    const container = document.body;
+    for (let i = 0; i < 600; i++) {
+        const star = document.createElement('div');
+        star.classList.add('shooting-star');
+        
+        const randomPosition = Math.random() * 200 - 100;
+        const x = randomPosition;
+        const y = -50 - randomPosition * 0.5;
+        
+        star.style.left = `${x}%`;
+        star.style.top = `${y}%`;
+        star.style.animationDelay = `${Math.random() * 5}s`;
+        container.appendChild(star);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const theme = "{{ session.get('theme', 'dark') }}";
+    const themeToggle = document.getElementById("theme-toggle");
+    
+    if (theme === "light") {
+        document.body.classList.remove("dark-mode");
+        themeToggle.checked = false;
+    } else {
+        document.body.classList.add("dark-mode");
+        themeToggle.checked = true;
+    }
+
+    localStorage.setItem("theme", theme);
+    createShootingStars();
+});
+
+socketio.on("redirect", (data) => {
+    alert(data.message);
+    window.location.href = "/";
+});
+
+socketio.on('clear_messages', function() {
+    document.getElementById('messages').innerHTML = '';
+});
+</script>
+
+{% for msg in messages %}
+<script type="text/javascript"> 
+    createMessage("{{msg.name}}", "{{msg.message}}");
+</script>
+{% endfor %}
+{% endblock %}

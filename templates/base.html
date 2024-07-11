@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>charDrop.</title>
+    <link rel="stylesheet" href="static/css/styles.css">
+    <script 
+        src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js" 
+        integrity="sha512-q/dWJ3kcmjBLU4Qc47E4A9kTB4m3wuTY7vkFJDTZKjTs8jhyGQnaUrxa0Ytd0ssMZhbNua9hE+E7Qv1j+DyZwA==" 
+        crossorigin="anonymous">
+    </script>
+    <link 
+        href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" 
+        rel="stylesheet">
+</head>
+<body>
+    <div class="content">
+        {% block content %} {% endblock %}
+    </div>
+
+    <div class="toggle-container">
+        <input type="checkbox" id="dark-mode-toggle" class="toggle">
+        <label for="dark-mode-toggle" class="toggle-label">
+            <span class="toggle-inner"></span>
+        </label>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const themeToggle = document.getElementById("dark-mode-toggle");
+            const logo = document.querySelector('.logo');
+    
+            const updateLogo = () => {
+                if (document.body.classList.contains("dark-mode")) {
+                    logo.src = "static/logoDark.png";
+                } else {
+                    logo.src = "static/logoLight.png";
+                }
+            };
+    
+            const savedTheme = localStorage.getItem("theme");
+            if (savedTheme === "light") {
+                document.body.classList.remove("dark-mode");
+                themeToggle.checked = false;
+            } else {
+                document.body.classList.add("dark-mode");
+                themeToggle.checked = true;
+            }
+    
+            updateLogo();
+    
+            themeToggle.addEventListener("change", () => {
+                if (themeToggle.checked) {
+                    document.body.classList.add("dark-mode");
+                    localStorage.setItem("theme", "dark");
+                } else {
+                    document.body.classList.remove("dark-mode");
+                    localStorage.setItem("theme", "light");
+                }
+                updateLogo();
+            });
+        });
+    </script>
+</body>
+</html>
