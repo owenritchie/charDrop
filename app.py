@@ -9,6 +9,7 @@ import string
 app = Flask(__name__)
 
 socketio = SocketIO(app)
+app.config["SECRET_KEY"] = "234d334ddas534"
 
 rooms = {}
 
@@ -187,4 +188,4 @@ def disconnect():
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    socketio.run(app, host= "0.0.0.0", port = 3000, debug=True)
